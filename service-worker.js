@@ -1,21 +1,23 @@
-const CACHE_NAME = 'senal-contra-v1';
+const CACHE_NAME = 'senal-contra-v2';
+
 const ASSETS_TO_CACHE = [
   './',
-  './tradinglatino-signals.html',
+  './index.html',
   './manifest.json',
+  './service-worker.js',
   'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap'
 ];
 
 // Install event — pre-cache assets
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.log('Pre-cache error (non-critical):', err);
-        // Don't fail install if some assets fail; app still works with dynamic caching
-        return cache.add('./tradinglatino-signals.html');
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        return cache.addAll(ASSETS_TO_CACHE).catch(err => {
+          console.log('Pre-cache error (non-critical):', err);
+        });
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -35,64 +37,82 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event — network-first for API calls, cache-first for assets
+// Fetch event
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Binance API calls: network-first (always try fresh data)
+  // Binance API calls: network-first
   if (url.hostname === 'api.binance.com') {
     event.respondWith(
-      fetch(request).then(response => {
-        // Cache successful API responses
-        if (response.ok) {
-          const clonedResponse = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, clonedResponse);
-          });
-        }
-        return response;
-      }).catch(() => {
-        // Fallback to cache on network error
-        return caches.match(request).then(cached => {
-          if (cached) {
-            console.log('Using cached Binance data (offline)');
-            return cached;
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clonedResponse = response.clone();
+
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, clonedResponse);
+            });
           }
-          // If no cache, return offline placeholder
-          return new Response(
-            JSON.stringify([]),
-            { status: 503, statusText: 'Offline - No cached data' }
-          );
-        });
-      })
+
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request).then(cached => {
+            if (cached) {
+              return cached;
+            }
+
+            return new Response(
+              JSON.stringify([]),
+              {
+                status: 503,
+                statusText: 'Offline - No cached data',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+          });
+        })
     );
-  } else {
-    // Static assets (HTML, CSS, JS, fonts): cache-first
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(response => {
+
+    return;
+  }
+
+  // Static assets
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) {
+        return cached;
+      }
+
+      return fetch(request)
+        .then(response => {
           if (!response || response.status !== 200 || response.type === 'error') {
             return response;
           }
+
           const clonedResponse = response.clone();
+
           caches.open(CACHE_NAME).then(cache => {
             cache.put(request, clonedResponse);
           });
+
           return response;
-        }).catch(() => {
-          // If both cache and network fail, return a minimal fallback
+        })
+        .catch(() => {
+          // If the requested resource is a document,
+          // use index.html as the offline fallback.
           if (request.destination === 'document') {
-            return caches.match('./tradinglatino-signals.html');
+            return caches.match('./index.html');
           }
         });
-      })
-    );
-  }
+    })
+  );
 });
 
-// Update check (optional: check for new version every 1h)
+// Allow the page to force the service worker to update
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
