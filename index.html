@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#16C79A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Señales">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="App de trading de señales multi-temporalidad basada en EMA, Squeeze, ADX y StochRSI para Binance">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%230B0E11' width='192' height='192'/><circle cx='96' cy='96' r='80' fill='%2316C79A'/><text x='96' y='110' font-size='60' font-weight='bold' text-anchor='middle' fill='%230B0E11'>◢</text></svg>">
+<title>Señales del Contra-Indicador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E11;
+    --panel:#12161C;
+    --panel-alt:#171C24;
+    --border:#232A33;
+    --border-soft:#1A2028;
+    --text:#E7ECEF;
+    --text-dim:#7C8896;
+    --text-faint:#4B5560;
+    --bull:#16C79A;
+    --bull-soft:rgba(22,199,154,.14);
+    --bull-line:rgba(22,199,154,.45);
+    --bear:#EF5D60;
+    --bear-soft:rgba(239,93,96,.14);
+    --bear-line:rgba(239,93,96,.45);
+    --amber:#E3B341;
+    --amber-soft:rgba(227,179,65,.14);
+    --font-display:'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-mono:'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font-mono);}
+  body{
+    min-height:100vh;padding:28px 20px 60px;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(22,199,154,.05), transparent 40%),
+      radial-gradient(circle at 85% 10%, rgba(239,93,96,.04), transparent 40%),
+      var(--bg);
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-faint);margin:0 0 6px;text-align:center;}
+  h1{font-family:var(--font-display);font-size:28px;font-weight:700;margin:0;letter-spacing:.02em;display:flex;align-items:center;gap:9px;}
+  .title-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+  .avatar-badge{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;transition:transform .2s ease;}
+  .avatar-badge:hover{transform:scale(1.12);}
+  .avatar-pesadito{border:2px solid var(--amber);box-shadow:0 0 8px -2px var(--amber);}
+  .avatar-contra{border:2px solid var(--bull);box-shadow:0 0 8px -2px var(--bull);}
+  .compass-icon{width:20px;height:20px;flex-shrink:0;animation:compassSpin 8s ease-in-out infinite;}
+  @keyframes compassSpin{0%,100%{transform:rotate(-8deg);}50%{transform:rotate(8deg);}}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);}
+  select, input[type=number], input[type=text]{background:var(--panel-alt);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:7px 9px;border-radius:6px;outline:none;}
+  select:focus, input:focus{border-color:var(--text-dim);}
+  input[type=number]{width:60px;}
+  .btn{align-self:flex-end;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;letter-spacing:.05em;padding:8px 14px;border-radius:6px;cursor:pointer;transition:border-color .15s ease, background .15s ease;}
+  .btn:hover{border-color:var(--text-dim);background:#1c222b;}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .status-line{display:flex;align-items:center;gap:8px;margin-left:auto;align-self:flex-end;font-size:11px;color:var(--text-faint);}
+  .dot-live{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .dot-live.ok{background:var(--bull);box-shadow:0 0 6px var(--bull);}
+  .dot-live.err{background:var(--bear);box-shadow:0 0 6px var(--bear);}
+
+  .hero{position:relative;border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:26px 24px;margin-bottom:20px;overflow:hidden;transition:border-color .3s ease, box-shadow .3s ease;}
+  .hero.long{border-color:var(--bull-line);box-shadow:0 0 0 1px var(--bull-line), 0 0 32px -8px rgba(22,199,154,.35);}
+  .hero.short{border-color:var(--bear-line);box-shadow:0 0 0 1px var(--bear-line), 0 0 32px -8px rgba(239,93,96,.35);}
+  .hero.pulse{animation:pulseGlow 1.8s ease-in-out infinite;}
+  @keyframes pulseGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.18);}}
+  .hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .hero-label{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px;}
+  .hero-verdict{font-family:var(--font-display);font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:12px;}
+  .hero-verdict.long{color:var(--bull);}
+  .hero-verdict.short{color:var(--bear);}
+  .hero-verdict.neutral{color:var(--text-dim);}
+  .hero-sub{margin-top:8px;font-size:13px;color:var(--text-dim);max-width:56ch;}
+  .price{text-align:right;font-family:var(--font-mono);}
+  .price .val{font-size:22px;font-weight:600;}
+  .price .lbl{font-size:10px;color:var(--text-faint);letter-spacing:.1em;text-transform:uppercase;}
+
+  .beacon{display:flex;gap:14px;margin-top:22px;flex-wrap:wrap;}
+  .light{flex:1;min-width:150px;border:1px solid var(--border-soft);border-radius:10px;padding:12px 14px;background:var(--panel-alt);display:flex;flex-direction:column;gap:8px;transition:border-color .25s ease, background .25s ease;}
+  .light .lname{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);}
+  .light .lstate{font-size:13px;font-weight:600;font-family:var(--font-display);}
+  .light-dot{width:9px;height:9px;border-radius:50%;background:var(--text-faint);}
+  .light.on-bull{border-color:var(--bull-line);background:var(--bull-soft);}
+  .light.on-bull .light-dot{background:var(--bull);box-shadow:0 0 8px var(--bull);}
+  .light.on-bull .lstate{color:var(--bull);}
+  .light.on-bear{border-color:var(--bear-line);background:var(--bear-soft);}
+  .light.on-bear .light-dot{background:var(--bear);box-shadow:0 0 8px var(--bear);}
+  .light.on-bear .lstate{color:var(--bear);}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  @media (max-width:920px){.grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr;}}
+  .panel{border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:16px;}
+  .panel h3{font-family:var(--font-display);font-size:13px;margin:0 0 12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;}
+  .panel h3 small{font-size:10px;color:var(--text-faint);font-family:var(--font-mono);font-weight:400;}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--border-soft);color:var(--text-dim);}
+  .kv:last-of-type{border-bottom:none;}
+  .kv b{color:var(--text);font-weight:600;}
+  .tag{display:inline-block;font-size:10.5px;padding:3px 8px;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;font-family:var(--font-mono);}
+  .tag.bull{background:var(--bull-soft);color:var(--bull);}
+  .tag.bear{background:var(--bear-soft);color:var(--bear);}
+  .tag.amber{background:var(--amber-soft);color:var(--amber);}
+  .tag.dim{background:var(--panel-alt);color:var(--text-faint);}
+  .histo{display:flex;align-items:flex-end;gap:2px;height:46px;margin-top:10px;}
+  .histo i{flex:1;border-radius:2px 2px 0 0;background:var(--text-faint);min-height:2px;}
+
+  .section{border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:16px;margin-bottom:16px;}
+  .section h3{font-family:var(--font-display);font-size:14px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;}
+  .section h3 small{font-size:10px;color:var(--text-faint);font-weight:400;font-family:var(--font-mono);}
+  .bt-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+  .bt-empty{font-size:12px;color:var(--text-faint);}
+  .bt-summary{font-size:12px;color:var(--text-dim);margin-bottom:10px;}
+  .bt-summary b{color:var(--text);}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{text-align:left;color:var(--text-faint);font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--border);}
+  td{padding:7px 8px;border-bottom:1px dashed var(--border-soft);color:var(--text-dim);}
+  tr:last-child td{border-bottom:none;}
+
+  .log{border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:16px;}
+  .log h3{font-family:var(--font-display);font-size:13px;margin:0 0 10px;}
+  .log-empty{font-size:12px;color:var(--text-faint);}
+  .log-row{display:flex;gap:10px;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--border-soft);color:var(--text-dim);}
+  .log-row:last-child{border-bottom:none;}
+  .log-row .t{color:var(--text-faint);width:64px;flex-shrink:0;}
+  .log-row .badge{font-weight:700;}
+  .log-row .badge.long{color:var(--bull);}
+  .log-row .badge.short{color:var(--bear);}
+
+  footer{margin-top:22px;font-size:11px;line-height:1.6;color:var(--text-faint);border-top:1px solid var(--border-soft);padding-top:16px;}
+  footer b{color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Panel de condiciones · Long / Short</p>
+  <div class="title-row">
+    <img class="avatar-badge avatar-pesadito" src="data:image/webp;base64,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" alt="El Pesadito de las Cripto" title="El Pesadito de las Cripto">
+    <h1>
+      CONTRA-INDICADOR
+      <svg class="compass-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" title="La brújula de El Contraindicador">
+        <circle cx="12" cy="12" r="9.5" stroke="var(--bull)" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="1.4" fill="var(--bull)"/>
+        <path d="M12 4.2L14 11L12 12L10 11L12 4.2Z" fill="var(--bull)"/>
+        <path d="M12 19.8L10 13L12 12L14 13L12 19.8Z" fill="var(--text-faint)"/>
+        <text x="12" y="3.4" text-anchor="middle" font-size="3" fill="var(--text-faint)" font-family="var(--font-mono)">N</text>
+      </svg>
+    </h1>
+    <img class="avatar-badge avatar-contra" src="data:image/webp;base64,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" alt="El Contraindicador" title="El Contraindicador">
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Par</label>
+      <select id="symbolSelect">
+        <option value="BTCUSDT">BTC/USDT</option>
+        <option value="ETHUSDT">ETH/USDT</option>
+        <option value="SOLUSDT">SOL/USDT</option>
+        <option value="XRPUSDT">XRP/USDT</option>
+        <option value="DOGEUSDT">DOGE/USDT</option>
+        <option value="PAXGUSDT">Oro (PAXG/USDT)</option>
+        <option value="__custom">Personalizado…</option>
+      </select>
+    </div>
+    <div class="field" id="customSymbolField" style="display:none;">
+      <label>Símbolo Binance</label>
+      <input type="text" id="customSymbol" placeholder="ej. LINKUSDT" style="width:120px;">
+    </div>
+    <div class="field">
+      <label>Tendencia (macro)</label>
+      <select id="trendInterval">
+        <option value="1d" selected>1D</option>
+        <option value="4h">4H</option>
+        <option value="1h">1H</option>
+        <option value="1w">1W</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Entrada (señal)</label>
+      <select id="signalInterval">
+        <option value="4h" selected>4H</option>
+        <option value="1h">1H</option>
+        <option value="15m">15m</option>
+        <option value="5m">5m</option>
+        <option value="3m">3m</option>
+        <option value="1m">1m</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>EMA rápida / lenta</label>
+      <div style="display:flex;gap:4px;">
+        <input type="number" id="emaFast" value="10" min="2" max="200">
+        <input type="number" id="emaSlow" value="55" min="2" max="400">
+      </div>
+    </div>
+    <div class="field">
+      <label>ADX mínimo</label>
+      <input type="number" id="adxThreshold" value="23" min="5" max="60">
+    </div>
+    <div class="field">
+      <label>StochRSI: RSI / Stoch</label>
+      <div style="display:flex;gap:4px;">
+        <input type="number" id="stochRsiLen" value="14" min="2" max="50" style="width:48px;">
+        <input type="number" id="stochLen" value="14" min="2" max="50" style="width:48px;">
+      </div>
+    </div>
+    <div class="field">
+      <label>StochRSI: K / D</label>
+      <div style="display:flex;gap:4px;">
+        <input type="number" id="stochK" value="3" min="1" max="20" style="width:44px;">
+        <input type="number" id="stochD" value="3" min="1" max="20" style="width:44px;">
+      </div>
+    </div>
+    <div class="field">
+      <label>Sobreventa / Sobrecompra</label>
+      <div style="display:flex;gap:4px;">
+        <input type="number" id="stochOS" value="20" min="1" max="49" style="width:48px;">
+        <input type="number" id="stochOB" value="80" min="51" max="99" style="width:48px;">
+      </div>
+    </div>
+    <div class="field" style="flex-direction:row;align-items:center;gap:7px;align-self:flex-end;padding-bottom:8px;">
+      <input type="checkbox" id="requireCross" checked style="accent-color:var(--bull);width:14px;height:14px;">
+      <label for="requireCross" style="text-transform:none;letter-spacing:0;font-size:11px;color:var(--text-dim);">Exigir cruce K/D de confirmación</label>
+    </div>
+    <button class="btn" id="refreshBtn">↻ Actualizar ahora</button>
+    <div class="status-line"><span class="dot-live" id="liveDot"></span><span id="statusText">esperando…</span></div>
+  </div>
+
+  <div class="hero neutral" id="hero">
+    <div class="hero-top">
+      <div>
+        <div class="hero-label" id="heroLabel">Veredicto actual</div>
+        <div class="hero-verdict neutral" id="heroVerdict">— SIN DATOS —</div>
+        <div class="hero-sub" id="heroSub">Configurá el par y presioná actualizar para evaluar las cuatro condiciones: tendencia, momentum, fuerza y timing (StochRSI).</div>
+      </div>
+      <div class="price"><div class="lbl">Último precio</div><div class="val" id="lastPrice">—</div></div>
+    </div>
+
+    <div class="beacon">
+      <div class="light" id="lightTrend"><div class="lname">① Tendencia · EMA</div><div style="display:flex;align-items:center;gap:6px;"><span class="light-dot"></span><span class="lstate">Sin datos</span></div></div>
+      <div class="light" id="lightMomentum"><div class="lname">② Momentum · Squeeze</div><div style="display:flex;align-items:center;gap:6px;"><span class="light-dot"></span><span class="lstate">Sin datos</span></div></div>
+      <div class="light" id="lightForce"><div class="lname">③ Fuerza · ADX</div><div style="display:flex;align-items:center;gap:6px;"><span class="light-dot"></span><span class="lstate">Sin datos</span></div></div>
+      <div class="light" id="lightStoch"><div class="lname">④ Timing · StochRSI</div><div style="display:flex;align-items:center;gap:6px;"><span class="light-dot"></span><span class="lstate">Sin datos</span></div></div>
+    </div>
+  </div>
+
+  <div class="section" id="preAlertSection">
+    <h3>Pre-alertas · anticipación <small>avisan antes de la confirmación completa</small></h3>
+    <div id="pre3Box" style="display:none;padding:11px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;line-height:1.5;"></div>
+    <div id="preSqzBox" style="display:none;padding:11px 14px;border-radius:8px;font-size:13px;line-height:1.5;"></div>
+    <div id="preNoneMsg" style="font-size:12px;color:var(--text-faint);">Sin pre-alertas activas por ahora.</div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3>Tendencia <small id="trendTfLabel">1D</small></h3>
+      <div class="kv"><span>EMA rápida</span><b id="emaFastVal">—</b></div>
+      <div class="kv"><span>EMA lenta</span><b id="emaSlowVal">—</b></div>
+      <div class="kv"><span>Sesgo</span><b id="trendTag"><span class="tag dim">—</span></b></div>
+    </div>
+    <div class="panel">
+      <h3>Momentum <small id="sqzTfLabel">4H</small></h3>
+      <div class="kv"><span>Valor histograma</span><b id="sqzVal">—</b></div>
+      <div class="kv"><span>Compresión (squeeze)</span><b id="sqzOnTag"><span class="tag dim">—</span></b></div>
+      <div class="kv"><span>Color barra</span><b id="sqzColorTag"><span class="tag dim">—</span></b></div>
+      <div class="histo" id="histo"></div>
+    </div>
+    <div class="panel">
+      <h3>Fuerza <small id="adxTfLabel">4H</small></h3>
+      <div class="kv"><span>ADX</span><b id="adxVal">—</b></div>
+      <div class="kv"><span>+DI / −DI</span><b id="diVal">—</b></div>
+      <div class="kv"><span>Estado</span><b id="adxTag"><span class="tag dim">—</span></b></div>
+    </div>
+    <div class="panel">
+      <h3>Timing <small id="stochTfLabel">4H</small></h3>
+      <div class="kv"><span>%K / %D</span><b id="stochKD">—</b></div>
+      <div class="kv"><span>Zona</span><b id="stochZoneTag"><span class="tag dim">—</span></b></div>
+      <div class="kv"><span>Cruce reciente</span><b id="stochCrossTag"><span class="tag dim">—</span></b></div>
+    </div>
+  </div>
+
+  <div class="section" id="extremeSection">
+    <h3>Señal extra · Sobrecompra extrema (solo Short) <small>independiente del veredicto principal</small></h3>
+    <div class="bt-controls" style="margin-bottom:14px;">
+      <div class="field"><label>Umbral 1H</label><input type="number" id="ext1hThresh" value="80" min="50" max="99"></div>
+      <div class="field"><label>Umbral 15m</label><input type="number" id="ext15mThresh" value="90" min="50" max="99"></div>
+      <div class="field"><label>Umbral 1m (confirma)</label><input type="number" id="ext1mThresh" value="98" min="50" max="100"></div>
+    </div>
+    <div id="extremeBanner" style="display:none;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-family:var(--font-display);font-weight:700;font-size:15px;"></div>
+    <div class="bt-controls" style="gap:10px;">
+      <div class="tf-mini" id="ext1hCard" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">1H</div>
+        <div class="kv"><span>%K</span><b id="ext1hK">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext1hTag"><span class="tag dim">—</span></b></div>
+      </div>
+      <div class="tf-mini" id="ext15mCard" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">15m</div>
+        <div class="kv"><span>%K</span><b id="ext15mK">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext15mTag"><span class="tag dim">—</span></b></div>
+      </div>
+      <div class="tf-mini" id="ext1mCard" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">1m <span style="color:var(--text-faint);font-weight:400;">(confirma)</span></div>
+        <div class="kv"><span>%K</span><b id="ext1mK">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext1mTag"><span class="tag dim">—</span></b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="extremeSectionLong">
+    <h3>Señal extra · Sobreventa extrema (solo Long) <small>independiente del veredicto principal</small></h3>
+    <div class="bt-controls" style="margin-bottom:14px;">
+      <div class="field"><label>Umbral 1H</label><input type="number" id="ext1hThreshLong" value="20" min="1" max="50"></div>
+      <div class="field"><label>Umbral 15m</label><input type="number" id="ext15mThreshLong" value="10" min="0" max="50"></div>
+      <div class="field"><label>Umbral 1m (confirma)</label><input type="number" id="ext1mThreshLong" value="2" min="0" max="50"></div>
+    </div>
+    <div id="extremeBannerLong" style="display:none;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-family:var(--font-display);font-weight:700;font-size:15px;"></div>
+    <div class="bt-controls" style="gap:10px;">
+      <div class="tf-mini" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">1H</div>
+        <div class="kv"><span>%K</span><b id="ext1hKLong">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext1hTagLong"><span class="tag dim">—</span></b></div>
+      </div>
+      <div class="tf-mini" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">15m</div>
+        <div class="kv"><span>%K</span><b id="ext15mKLong">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext15mTagLong"><span class="tag dim">—</span></b></div>
+      </div>
+      <div class="tf-mini" style="flex:1;min-width:140px;border:1px solid var(--border-soft);background:var(--panel-alt);border-radius:9px;padding:11px 12px;">
+        <div style="font-family:var(--font-display);font-weight:700;font-size:12.5px;margin-bottom:6px;">1m <span style="color:var(--text-faint);font-weight:400;">(confirma)</span></div>
+        <div class="kv"><span>%K</span><b id="ext1mKLong">—</b></div>
+        <div class="kv"><span>Estado</span><b id="ext1mTagLong"><span class="tag dim">—</span></b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="log" id="extremeLog">
+    <h3>Historial de señales extremas <small>se guarda 10 días</small></h3>
+    <div id="extremeLogList"><div class="log-empty">Todavía no se registraron señales extremas.</div></div>
+  </div>
+
+  <div class="log" id="preLog">
+    <h3>Historial de pre-alertas <small>se guarda 10 días</small></h3>
+    <div id="preLogList"><div class="log-empty">Todavía no se registraron pre-alertas.</div></div>
+  </div>
+
+  <div class="section">
+    <h3>Backtest simple <small>sobre el historial ya cargado</small></h3>
+    <div class="bt-controls">
+      <div class="field"><label>Mirar adelante (velas de señal)</label><input type="number" id="btLookahead" value="30" min="5" max="200"></div>
+      <div class="field"><label>Umbral acierto/fallo %</label><input type="number" id="btThreshold" value="0.5" min="0.1" max="5" step="0.1"></div>
+      <button class="btn" id="btRunBtn" disabled>▶ Correr backtest</button>
+    </div>
+    <div id="btSummary" class="bt-summary" style="display:none;"></div>
+    <div id="btResults"><div class="bt-empty">Corré primero "Actualizar ahora" para tener datos, después presioná "Correr backtest".</div></div>
+  </div>
+
+  <div class="log">
+    <h3>Historial de señales <small>se guarda 10 días</small></h3>
+    <div id="logList"><div class="log-empty">Todavía no se registraron cambios de señal.</div></div>
+  </div>
+
+  <footer>
+    Implementación no oficial y con fines educativos de la lógica pública de <b>Jaime Merino / TradingLatino</b> (cruce EMA, Squeeze Momentum Indicator de LazyBear, ADX y Stochastic RSI como filtro de timing). Los parámetros son aproximados y ajustables. Las señales se calculan únicamente sobre <b>velas ya cerradas</b> (se descarta la vela en formación) para evitar parpadeos y falsas señales por datos incompletos. El backtest usa el historial ya cargado y es una aproximación direccional simple, no una simulación de cuenta ni de comisiones/slippage. Esto <b>no es asesoría financiera</b>. Los datos se piden directamente a la API pública de Binance desde tu navegador. Actualización automática cada 60s.
+    <br><br>
+    <span style="opacity:.7;">🧭 Con la brújula de <b>El Contraindicador</b> y el optimismo de <b>El Pesadito de las Cripto</b>.</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d=2) => n==null || isNaN(n) ? '—' : Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const fmtPrice = n => { if(n==null) return '—'; const d = n < 1 ? 6 : n < 100 ? 4 : 2; return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
+
+  let prevOverall = null;
+  let prevExtreme = false;
+  let prevExtremeLong = false;
+  let prevPre3 = 'NONE';
+  let prevPreSqz = 'NONE';
+  let logEntries = [];
+  let extremeLogEntries = [];
+  let preLogEntries = [];
+  let pollTimer = null;
+  let lastData = null; // { symbol, params, trend:{openTime,close,emaFast,emaSlow}, signal:{openTime,close,high,low,sqzVal,sqzOn,adx,stochK,stochD} }
+
+  // ---------------- persistent history (localStorage, 10 días) ----------------
+  const RETENTION_MS = 10*24*60*60*1000;
+  const LOG_KEY = 'contraindicador_log_v1';
+  const EXT_LOG_KEY = 'contraindicador_extlog_v1';
+  const PRE_LOG_KEY = 'contraindicador_prelog_v1';
+
+  function loadPersisted(key){
+    try{
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      const cutoff = Date.now() - RETENTION_MS;
+      return arr.filter(e => e.ts >= cutoff);
+    }catch(e){ return []; }
+  }
+  function savePersisted(key, arr){
+    try{
+      const cutoff = Date.now() - RETENTION_MS;
+      const pruned = arr.filter(e => e.ts >= cutoff);
+      localStorage.setItem(key, JSON.stringify(pruned));
+    }catch(e){ /* storage unavailable — app keeps working in-memory only */ }
+  }
+
+  // ---------------- indicator math ----------------
+  function computeSMA(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let s=0; for(let j=i-len+1;j<=i;j++) s+=values[j]; out[i]=s/len; }
+    return out;
+  }
+  function computeEMA(values, len){
+    const out = new Array(values.length).fill(null);
+    const k = 2/(len+1);
+    if (len-1 >= values.length) return out;
+    let sum=0; for(let j=0;j<len;j++) sum+=values[j];
+    out[len-1]=sum/len;
+    for (let i=len;i<values.length;i++) out[i] = values[i]*k + out[i-1]*(1-k);
+    return out;
+  }
+  function computeStdDev(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){
+      let s=0; for(let j=i-len+1;j<=i;j++) s+=values[j];
+      const mean=s/len;
+      let sq=0; for(let j=i-len+1;j<=i;j++) sq+=Math.pow(values[j]-mean,2);
+      out[i]=Math.sqrt(sq/len);
+    }
+    return out;
+  }
+  function computeHighest(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let m=-Infinity; for(let j=i-len+1;j<=i;j++) if(values[j]>m) m=values[j]; out[i]=m; }
+    return out;
+  }
+  function computeLowest(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let m=Infinity; for(let j=i-len+1;j<=i;j++) if(values[j]<m) m=values[j]; out[i]=m; }
+    return out;
+  }
+  function computeTR(high, low, close){
+    const out = new Array(close.length).fill(null);
+    for (let i=0;i<close.length;i++){
+      if (i===0){ out[i]=high[i]-low[i]; continue; }
+      out[i]=Math.max(high[i]-low[i], Math.abs(high[i]-close[i-1]), Math.abs(low[i]-close[i-1]));
+    }
+    return out;
+  }
+  function computeRMA(values, len){
+    const out = new Array(values.length).fill(null);
+    if (values.length<len) return out;
+    let seed=0; for(let j=0;j<len;j++) seed+=values[j];
+    out[len-1]=seed/len;
+    for (let i=len;i<values.length;i++) out[i] = (out[i-1]*(len-1) + values[i]) / len;
+    return out;
+  }
+  function computeADX(high, low, close, len){
+    const n = close.length;
+    const plusDM = new Array(n).fill(0), minusDM = new Array(n).fill(0);
+    const tr = computeTR(high, low, close);
+    for (let i=1;i<n;i++){
+      const upMove = high[i]-high[i-1], downMove = low[i-1]-low[i];
+      plusDM[i] = (upMove>downMove && upMove>0) ? upMove : 0;
+      minusDM[i] = (downMove>upMove && downMove>0) ? downMove : 0;
+    }
+    const trRMA = computeRMA(tr, len), plusDMRMA = computeRMA(plusDM, len), minusDMRMA = computeRMA(minusDM, len);
+    const plusDI = new Array(n).fill(null), minusDI = new Array(n).fill(null), dx = new Array(n).fill(null);
+    for (let i=0;i<n;i++){
+      if (trRMA[i]==null || trRMA[i]===0) continue;
+      plusDI[i] = 100*plusDMRMA[i]/trRMA[i];
+      minusDI[i] = 100*minusDMRMA[i]/trRMA[i];
+      const sum = plusDI[i]+minusDI[i];
+      dx[i] = sum===0?0:100*Math.abs(plusDI[i]-minusDI[i])/sum;
+    }
+    const startIdx = dx.findIndex(v=>v!=null);
+    const adx = new Array(n).fill(null);
+    if (startIdx>=0){ const dxSlice = dx.slice(startIdx); const adxRMA = computeRMA(dxSlice, len); for (let i=0;i<adxRMA.length;i++) adx[startIdx+i]=adxRMA[i]; }
+    return { adx, plusDI, minusDI };
+  }
+  function computeSqueeze(high, low, close, bbLen, bbMult, kcLen, kcMult){
+    const n = close.length;
+    const basis = computeSMA(close, bbLen);
+    const stdev = computeStdDev(close, bbLen);
+    const upperBB = basis.map((b,i)=> b==null||stdev[i]==null?null:b+stdev[i]*bbMult);
+    const lowerBB = basis.map((b,i)=> b==null||stdev[i]==null?null:b-stdev[i]*bbMult);
+    const maKC = computeSMA(close, kcLen);
+    const tr = computeTR(high, low, close);
+    const rangeMA = computeSMA(tr, kcLen);
+    const upperKC = maKC.map((m,i)=> m==null||rangeMA[i]==null?null:m+rangeMA[i]*kcMult);
+    const lowerKC = maKC.map((m,i)=> m==null||rangeMA[i]==null?null:m-rangeMA[i]*kcMult);
+    const highestHigh = computeHighest(high, kcLen), lowestLow = computeLowest(low, kcLen), smaClose = computeSMA(close, kcLen);
+    const valSource = new Array(n).fill(null);
+    for (let i=0;i<n;i++){
+      if (highestHigh[i]==null||lowestLow[i]==null||smaClose[i]==null) continue;
+      const midHL = (highestHigh[i]+lowestLow[i])/2;
+      valSource[i] = close[i]-((midHL+smaClose[i])/2);
+    }
+    const val = new Array(n).fill(null);
+    for (let i=kcLen-1;i<n;i++){
+      let ok=true; for (let j=i-kcLen+1;j<=i;j++){ if(valSource[j]==null){ok=false;break;} }
+      if(!ok) continue;
+      let sumX=0,sumY=0,sumXY=0,sumX2=0;
+      for (let x=0;x<kcLen;x++){ const y=valSource[i-kcLen+1+x]; sumX+=x; sumY+=y; sumXY+=x*y; sumX2+=x*x; }
+      const denom = (kcLen*sumX2-sumX*sumX);
+      const slope = denom===0?0:(kcLen*sumXY-sumX*sumY)/denom;
+      const intercept = (sumY-slope*sumX)/kcLen;
+      val[i] = intercept+slope*(kcLen-1);
+    }
+    const sqzOn = new Array(n).fill(null);
+    for (let i=0;i<n;i++){
+      if(lowerBB[i]==null||lowerKC[i]==null||upperBB[i]==null||upperKC[i]==null) continue;
+      sqzOn[i] = (lowerBB[i] > lowerKC[i]) && (upperBB[i] < upperKC[i]);
+    }
+    return { val, sqzOn };
+  }
+  function computeHighestSafe(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let ok=true,m=-Infinity; for (let j=i-len+1;j<=i;j++){ if(values[j]==null){ok=false;break;} if(values[j]>m) m=values[j]; } out[i]=ok?m:null; }
+    return out;
+  }
+  function computeLowestSafe(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let ok=true,m=Infinity; for (let j=i-len+1;j<=i;j++){ if(values[j]==null){ok=false;break;} if(values[j]<m) m=values[j]; } out[i]=ok?m:null; }
+    return out;
+  }
+  function computeSMASafe(values, len){
+    const out = new Array(values.length).fill(null);
+    for (let i=len-1;i<values.length;i++){ let ok=true,s=0; for (let j=i-len+1;j<=i;j++){ if(values[j]==null){ok=false;break;} s+=values[j]; } out[i]=ok?s/len:null; }
+    return out;
+  }
+  function computeRSI(values, len){
+    const n = values.length;
+    const gains = new Array(n).fill(0), losses = new Array(n).fill(0);
+    for (let i=1;i<n;i++){ const diff = values[i]-values[i-1]; gains[i]=diff>0?diff:0; losses[i]=diff<0?-diff:0; }
+    const avgGain = computeRMA(gains, len), avgLoss = computeRMA(losses, len);
+    const rsi = new Array(n).fill(null);
+    for (let i=0;i<n;i++){
+      if (avgGain[i]==null||avgLoss[i]==null) continue;
+      if (avgLoss[i]===0){ rsi[i]=100; continue; }
+      rsi[i] = 100-(100/(1+avgGain[i]/avgLoss[i]));
+    }
+    return rsi;
+  }
+  function computeStochRSI(close, rsiLen, stochLen, kSmooth, dSmooth){
+    const rsi = computeRSI(close, rsiLen);
+    const rsiHighest = computeHighestSafe(rsi, stochLen), rsiLowest = computeLowestSafe(rsi, stochLen);
+    const stochRaw = rsi.map((v,i)=>{
+      if (v==null||rsiHighest[i]==null||rsiLowest[i]==null) return null;
+      const range = rsiHighest[i]-rsiLowest[i];
+      return range===0 ? 50 : ((v-rsiLowest[i])/range)*100;
+    });
+    const k = computeSMASafe(stochRaw, kSmooth);
+    const d = computeSMASafe(k, dSmooth);
+    return { k, d };
+  }
+  function squeezeColor(val, prevVal){
+    if (val==null) return 'na';
+    if (val>0) return (prevVal!=null && val>prevVal) ? 'lime' : 'green';
+    return (prevVal!=null && val<prevVal) ? 'red' : 'maroon';
+  }
+
+  // ---------------- data fetch (closed candles only) ----------------
+  // Binance always returns the currently-forming candle as the last element.
+  // We fetch one extra and drop it so every indicator is computed on fully
+  // closed candles only — avoids repainting / flip-flopping signals mid-bar.
+  async function fetchKlinesClosed(symbol, interval, limit){
+    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit+1}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const raw = await res.json();
+    const livePrice = raw.length ? parseFloat(raw[raw.length-1][4]) : null;
+    const closedRaw = raw.slice(0, -1); // drop the forming candle
+    return {
+      livePrice,
+      openTime: closedRaw.map(k=>k[0]),
+      high: closedRaw.map(k=>parseFloat(k[2])),
+      low: closedRaw.map(k=>parseFloat(k[3])),
+      close: closedRaw.map(k=>parseFloat(k[4])),
+    };
+  }
+
+  function findIndexAtOrBefore(openTimeArr, t){
+    let lo=0, hi=openTimeArr.length-1, ans=-1;
+    while(lo<=hi){ const mid=(lo+hi)>>1; if(openTimeArr[mid]<=t){ans=mid; lo=mid+1;} else hi=mid-1; }
+    return ans;
+  }
+
+  function beep(freq){
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type='sine'; osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.5);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime+0.55);
+    }catch(e){}
+  }
+  function pushLog(type, symbol){
+    const now = new Date();
+    const t = now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    logEntries.unshift({t, ts: now.getTime(), type, symbol});
+    savePersisted(LOG_KEY, logEntries);
+    logEntries = loadPersisted(LOG_KEY); // re-read pruned/sorted state
+    renderMainLog();
+  }
+  function renderMainLog(){
+    const el = $('logList');
+    if (!logEntries.length){ el.innerHTML = '<div class="log-empty">Todavía no se registraron cambios de señal.</div>'; return; }
+    el.innerHTML = logEntries.map(e=>{
+      const cls = e.type==='LONG' ? 'long' : e.type==='SHORT' ? 'short' : '';
+      return `<div class="log-row"><span class="t">${e.t}</span><span class="badge ${cls}">${e.type}</span><span>${e.symbol}</span></div>`;
+    }).join('');
+  }
+
+  function pushExtremeLog(type, symbol){
+    const now = new Date();
+    const t = now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    extremeLogEntries.unshift({t, ts: now.getTime(), type, symbol});
+    savePersisted(EXT_LOG_KEY, extremeLogEntries);
+    extremeLogEntries = loadPersisted(EXT_LOG_KEY);
+    renderExtremeLog();
+  }
+  function renderExtremeLog(){
+    const el = $('extremeLogList');
+    if (!extremeLogEntries.length){ el.innerHTML = '<div class="log-empty">Todavía no se registraron señales extremas.</div>'; return; }
+    el.innerHTML = extremeLogEntries.map(e=>{
+      const isLong = e.type==='LONG-EXTREMO';
+      const bg = isLong ? 'var(--bull-soft)' : 'var(--bear-soft)';
+      const fg = isLong ? 'var(--bull)' : 'var(--bear)';
+      const label = isLong ? '▲ LONG EXTREMO' : '▼ SHORT EXTREMO';
+      return `<div class="log-row" style="background:${bg};border-radius:6px;padding:6px 10px;margin-bottom:4px;border-bottom:none;"><span class="t">${e.t}</span><span class="badge" style="color:${fg};">${label}</span><span>${e.symbol}</span></div>`;
+    }).join('');
+  }
+
+  function pushPreLog(type, symbol){
+    const now = new Date();
+    const t = now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    preLogEntries.unshift({t, ts: now.getTime(), type, symbol});
+    savePersisted(PRE_LOG_KEY, preLogEntries);
+    preLogEntries = loadPersisted(PRE_LOG_KEY);
+    renderPreLog();
+  }
+  function renderPreLog(){
+    const el = $('preLogList');
+    if (!preLogEntries.length){ el.innerHTML = '<div class="log-empty">Todavía no se registraron pre-alertas.</div>'; return; }
+    el.innerHTML = preLogEntries.map(e=>{
+      const isLong = e.type.endsWith('-LONG');
+      const isSqz = e.type.startsWith('PRESQZ');
+      const bg = isLong ? 'var(--bull-soft)' : 'var(--bear-soft)';
+      const fg = isLong ? 'var(--bull)' : 'var(--bear)';
+      const label = (isSqz ? '⚠ SQUEEZE ' : '⚠ 3/4 ') + (isLong ? 'LONG' : 'SHORT');
+      return `<div class="log-row" style="background:${bg};border-radius:6px;padding:6px 10px;margin-bottom:4px;border-bottom:none;"><span class="t">${e.t}</span><span class="badge" style="color:${fg};">${label}</span><span>${e.symbol}</span></div>`;
+    }).join('');
+  }
+  function setLight(el, state, label){
+    el.className = 'light' + (state==='bull'?' on-bull':state==='bear'?' on-bear':'');
+    el.querySelector('.lstate').textContent = label;
+  }
+  function renderHisto(valArr){
+    const last = valArr.slice(-20);
+    const maxAbs = Math.max(1e-9, ...last.map(v=>Math.abs(v||0)));
+    const html = last.map((v,i)=>{
+      if (v==null) return '<i style="height:2px;background:var(--text-faint);"></i>';
+      const prev = last[i-1];
+      const color = v>0 ? (prev!=null && v>prev ? 'var(--bull)' : 'rgba(22,199,154,.55)') : (prev!=null && v<prev ? 'var(--bear)' : 'rgba(239,93,96,.55)');
+      const h = Math.max(2, Math.round((Math.abs(v)/maxAbs)*44));
+      return `<i style="height:${h}px;background:${color};"></i>`;
+    }).join('');
+    $('histo').innerHTML = html;
+  }
+
+  // evaluate the "signal" bundle's derived state at index i, with requireCross applied
+  function evalSignalAt(sig, i, params){
+    const vLast = sig.sqzVal[i], vPrev = sig.sqzVal[i-1];
+    const sqzOnLast = sig.sqzOn[i];
+    const adxLast = sig.adx[i];
+    const adxOk = adxLast!=null && adxLast >= params.adxThreshold;
+    const kLast = sig.stochK[i], kPrev = sig.stochK[i-1];
+    const dLast = sig.stochD[i], dPrev = sig.stochD[i-1];
+    const crossUp = kLast!=null&&dLast!=null&&kPrev!=null&&dPrev!=null && kLast>dLast && kPrev<=dPrev;
+    const crossDown = kLast!=null&&dLast!=null&&kPrev!=null&&dPrev!=null && kLast<dLast && kPrev>=dPrev;
+    const oversold = kLast!=null && kLast <= params.stochOS;
+    const overbought = kLast!=null && kLast >= params.stochOB;
+    const stochLongOk = kLast==null ? false : (params.requireCross ? (oversold && crossUp) : oversold);
+    const stochShortOk = kLast==null ? false : (params.requireCross ? (overbought && crossDown) : overbought);
+    return { vLast, vPrev, sqzOnLast, adxLast, adxOk, kLast, dLast, crossUp, crossDown, oversold, overbought, stochLongOk, stochShortOk, momentumBull: vLast!=null&&vLast>0, momentumBear: vLast!=null&&vLast<0 };
+  }
+
+  // ---------------- main run ----------------
+  async function run(){
+    const symSel = $('symbolSelect').value;
+    const symbol = symSel === '__custom' ? ($('customSymbol').value.trim().toUpperCase() || 'BTCUSDT') : symSel;
+    const trendInterval = $('trendInterval').value;
+    const signalInterval = $('signalInterval').value;
+    const params = {
+      emaFast: parseInt($('emaFast').value)||10,
+      emaSlow: parseInt($('emaSlow').value)||55,
+      adxThreshold: parseFloat($('adxThreshold').value)||23,
+      stochRsiLen: parseInt($('stochRsiLen').value)||14,
+      stochLen: parseInt($('stochLen').value)||14,
+      stochK: parseInt($('stochK').value)||3,
+      stochD: parseInt($('stochD').value)||3,
+      stochOS: parseFloat($('stochOS').value)||5,
+      stochOB: parseFloat($('stochOB').value)||98,
+      requireCross: $('requireCross').checked,
+    };
+
+    $('trendTfLabel').textContent = trendInterval.toUpperCase();
+    $('sqzTfLabel').textContent = signalInterval.toUpperCase();
+    $('adxTfLabel').textContent = signalInterval.toUpperCase();
+    $('stochTfLabel').textContent = signalInterval.toUpperCase();
+
+    $('liveDot').className = 'dot-live';
+    $('statusText').textContent = 'actualizando…';
+
+    try{
+      const [trendKl, sigKl, ext1hKl, ext15mKl, ext1mKl] = await Promise.all([
+        fetchKlinesClosed(symbol, trendInterval, Math.min(1000, Math.max(params.emaSlow*6, 400))),
+        fetchKlinesClosed(symbol, signalInterval, 400),
+        fetchKlinesClosed(symbol, '1h', 200),
+        fetchKlinesClosed(symbol, '15m', 200),
+        fetchKlinesClosed(symbol, '1m', 200)
+      ]);
+
+      const emaFastArr = computeEMA(trendKl.close, params.emaFast);
+      const emaSlowArr = computeEMA(trendKl.close, params.emaSlow);
+      const sqz = computeSqueeze(sigKl.high, sigKl.low, sigKl.close, 20, 2, 20, 1.5);
+      const adxRes = computeADX(sigKl.high, sigKl.low, sigKl.close, 14);
+      const stoch = computeStochRSI(sigKl.close, params.stochRsiLen, params.stochLen, params.stochK, params.stochD);
+
+      const trend = { openTime: trendKl.openTime, close: trendKl.close, emaFast: emaFastArr, emaSlow: emaSlowArr };
+      const signal = { openTime: sigKl.openTime, close: sigKl.close, high: sigKl.high, low: sigKl.low, sqzVal: sqz.val, sqzOn: sqz.sqzOn, adx: adxRes.adx, plusDI: adxRes.plusDI, minusDI: adxRes.minusDI, stochK: stoch.k, stochD: stoch.d };
+      lastData = { symbol, params, trend, signal };
+      $('btRunBtn').disabled = false;
+
+      const efLast = emaFastArr[emaFastArr.length-1], esLast = emaSlowArr[emaSlowArr.length-1];
+      const trendBull = efLast!=null && esLast!=null && efLast > esLast;
+      const trendKnown = efLast!=null && esLast!=null;
+
+      const sIdx = signal.close.length-1;
+      const es = evalSignalAt(signal, sIdx, params);
+
+      $('lastPrice').textContent = fmtPrice(sigKl.livePrice ?? signal.close[sIdx]);
+      $('emaFastVal').textContent = fmtPrice(efLast);
+      $('emaSlowVal').textContent = fmtPrice(esLast);
+      $('trendTag').innerHTML = !trendKnown ? '<span class="tag dim">—</span>' : trendBull ? '<span class="tag bull">Alcista</span>' : '<span class="tag bear">Bajista</span>';
+
+      $('sqzVal').textContent = es.vLast==null ? '—' : fmt(es.vLast, 2);
+      $('sqzOnTag').innerHTML = es.sqzOnLast==null ? '<span class="tag dim">—</span>' : es.sqzOnLast ? '<span class="tag amber">En compresión</span>' : '<span class="tag dim">Liberado</span>';
+      const color = squeezeColor(es.vLast, es.vPrev);
+      const colorLabelMap = {lime:['Lime · impulso alcista fuerte','bull'], green:['Verde · impulso alcista débil','bull'], red:['Rojo · impulso bajista fuerte','bear'], maroon:['Marrón · impulso bajista débil','bear'], na:['—','dim']};
+      const [colorLabel, colorTagClass] = colorLabelMap[color];
+      $('sqzColorTag').innerHTML = `<span class="tag ${colorTagClass}">${colorLabel}</span>`;
+      renderHisto(sqz.val);
+
+      $('adxVal').textContent = es.adxLast==null ? '—' : fmt(es.adxLast,1);
+      const diP = signal.plusDI[sIdx], diM = signal.minusDI[sIdx];
+      $('diVal').textContent = (diP==null||diM==null) ? '—' : `${fmt(diP,1)} / ${fmt(diM,1)}`;
+      $('adxTag').innerHTML = es.adxLast==null ? '<span class="tag dim">—</span>' : es.adxOk ? '<span class="tag bull">Fuerza suficiente</span>' : '<span class="tag dim">Débil / lateral</span>';
+
+      $('stochKD').textContent = (es.kLast==null||es.dLast==null) ? '—' : `${fmt(es.kLast,1)} / ${fmt(es.dLast,1)}`;
+      $('stochZoneTag').innerHTML = es.kLast==null ? '<span class="tag dim">—</span>' : es.oversold ? '<span class="tag bull">Sobrevendido</span>' : es.overbought ? '<span class="tag bear">Sobrecomprado</span>' : '<span class="tag dim">Neutral</span>';
+      $('stochCrossTag').innerHTML = es.crossUp ? '<span class="tag bull">%K cruzó %D al alza</span>' : es.crossDown ? '<span class="tag bear">%K cruzó %D a la baja</span>' : '<span class="tag dim">Sin cruce reciente</span>';
+
+      setLight($('lightTrend'), !trendKnown ? 'na' : (trendBull?'bull':'bear'), !trendKnown?'Sin datos':(trendBull?'Alcista':'Bajista'));
+      setLight($('lightMomentum'), es.momentumBull?'bull':es.momentumBear?'bear':'na', es.momentumBull?'A favor del Long':es.momentumBear?'A favor del Short':'Sin datos');
+      setLight($('lightForce'), es.adxOk ? (trendBull?'bull':'bear') : 'na', es.adxOk?'Tendencia con fuerza':'Fuerza insuficiente');
+      setLight($('lightStoch'), es.stochLongOk?'bull':es.stochShortOk?'bear':'na', es.kLast==null ? 'Sin datos' : es.stochLongOk ? 'Sobrevendido ✓' : es.stochShortOk ? 'Sobrecomprado ✓' : 'Fuera de zona');
+
+      let overall = 'NONE';
+      let sub = 'Todavía no se alinean las cuatro condiciones (tendencia, momentum, fuerza y timing) requeridas por la estrategia.';
+      if (trendBull && es.momentumBull && es.adxOk && es.stochLongOk){
+        overall='LONG';
+        sub = `EMA${params.emaFast} > EMA${params.emaSlow} en ${trendInterval.toUpperCase()}, momentum positivo en ${signalInterval.toUpperCase()}, ADX ≥ ${params.adxThreshold} y StochRSI en sobreventa (≤${params.stochOS}). Las cuatro condiciones de entrada en largo se cumplen.`;
+      } else if (!trendBull && es.momentumBear && es.adxOk && es.stochShortOk){
+        overall='SHORT';
+        sub = `EMA${params.emaFast} < EMA${params.emaSlow} en ${trendInterval.toUpperCase()}, momentum negativo en ${signalInterval.toUpperCase()}, ADX ≥ ${params.adxThreshold} y StochRSI en sobrecompra (≥${params.stochOB}). Las cuatro condiciones de entrada en corto se cumplen.`;
+      } else if (trendBull && es.momentumBull && es.adxOk && !es.stochLongOk){
+        sub = `Tendencia, momentum y fuerza a favor del Long, pero el StochRSI (${fmt(es.kLast,1)}) todavía no está en sobreventa (≤${params.stochOS}). Esperando mejor punto de entrada.`;
+      } else if (!trendBull && es.momentumBear && es.adxOk && !es.stochShortOk){
+        sub = `Tendencia, momentum y fuerza a favor del Short, pero el StochRSI (${fmt(es.kLast,1)}) todavía no está en sobrecompra (≥${params.stochOB}). Esperando mejor punto de entrada.`;
+      } else if (es.sqzOnLast){
+        sub = 'El mercado está en compresión (squeeze on): baja volatilidad, posible movimiento fuerte en preparación. Todavía sin las cuatro condiciones alineadas.';
+      }
+
+      const hero = $('hero'), verdictEl = $('heroVerdict');
+      hero.className = 'hero ' + (overall==='LONG'?'long':overall==='SHORT'?'short':'neutral');
+      verdictEl.className = 'hero-verdict ' + (overall==='LONG'?'long':overall==='SHORT'?'short':'neutral');
+      verdictEl.textContent = overall==='LONG' ? '▲ LONG' : overall==='SHORT' ? '▼ SHORT' : '— SIN SEÑAL —';
+      $('heroLabel').textContent = `Veredicto actual · ${symbol}`;
+      $('heroSub').textContent = sub;
+
+      if ((overall==='LONG' || overall==='SHORT') && overall !== prevOverall){
+        hero.classList.add('pulse'); beep(overall==='LONG'?880:440); pushLog(overall, symbol);
+      } else { hero.classList.remove('pulse'); }
+      prevOverall = overall;
+
+      // ---- Pre-alerta A: 3 de 4 condiciones (falta solo el timing de StochRSI) ----
+      const pre3Long = trendBull && es.momentumBull && es.adxOk && !es.stochLongOk;
+      const pre3Short = !trendBull && es.momentumBear && es.adxOk && !es.stochShortOk;
+      const pre3State = pre3Long ? 'LONG' : pre3Short ? 'SHORT' : 'NONE';
+
+      const pre3Box = $('pre3Box');
+      if (pre3State !== 'NONE'){
+        pre3Box.style.display = 'block';
+        pre3Box.style.background = pre3State==='LONG' ? 'var(--bull-soft)' : 'var(--bear-soft)';
+        pre3Box.style.border = '1px solid ' + (pre3State==='LONG' ? 'var(--bull-line)' : 'var(--bear-line)');
+        pre3Box.style.color = pre3State==='LONG' ? 'var(--bull)' : 'var(--bear)';
+        pre3Box.textContent = `⚠ 3 de 4 — Tendencia, momentum y fuerza a favor del ${pre3State}. Falta solo el timing de StochRSI (${fmt(es.kLast,1)}).`;
+      } else {
+        pre3Box.style.display = 'none';
+      }
+      if (pre3State !== 'NONE' && pre3State !== prevPre3){
+        beep(600); pushPreLog('PRE3-'+pre3State, symbol);
+      }
+      prevPre3 = pre3State;
+
+      // ---- Pre-alerta B: squeeze en compresión + tendencia + momentum a favor (sin exigir ADX ni StochRSI) ----
+      const preSqzLong = trendBull && es.sqzOnLast && es.momentumBull;
+      const preSqzShort = !trendBull && es.sqzOnLast && es.momentumBear;
+      const preSqzState = preSqzLong ? 'LONG' : preSqzShort ? 'SHORT' : 'NONE';
+
+      const preSqzBox = $('preSqzBox');
+      if (preSqzState !== 'NONE'){
+        preSqzBox.style.display = 'block';
+        preSqzBox.style.background = preSqzState==='LONG' ? 'var(--bull-soft)' : 'var(--bear-soft)';
+        preSqzBox.style.border = '1px solid ' + (preSqzState==='LONG' ? 'var(--bull-line)' : 'var(--bear-line)');
+        preSqzBox.style.color = preSqzState==='LONG' ? 'var(--bull)' : 'var(--bear)';
+        preSqzBox.textContent = `⚠ Squeeze comprimido — tendencia y momentum ya apuntan a ${preSqzState}. Posible movimiento en preparación (todavía sin fuerza ADX confirmada).`;
+      } else {
+        preSqzBox.style.display = 'none';
+      }
+      if (preSqzState !== 'NONE' && preSqzState !== prevPreSqz){
+        beep(600); pushPreLog('PRESQZ-'+preSqzState, symbol);
+      }
+      prevPreSqz = preSqzState;
+
+      $('preNoneMsg').style.display = (pre3State==='NONE' && preSqzState==='NONE') ? 'block' : 'none';
+
+      // ---- Señal extra: sobrecompra extrema en cascada 1H → 15m → 1m (solo Short) ----
+      const ext1hThresh = parseFloat($('ext1hThresh').value)||80;
+      const ext15mThresh = parseFloat($('ext15mThresh').value)||90;
+      const ext1mThresh = parseFloat($('ext1mThresh').value)||98;
+
+      const stoch1h = computeStochRSI(ext1hKl.close, params.stochRsiLen, params.stochLen, params.stochK, params.stochD);
+      const stoch15m = computeStochRSI(ext15mKl.close, params.stochRsiLen, params.stochLen, params.stochK, params.stochD);
+      const stoch1m = computeStochRSI(ext1mKl.close, params.stochRsiLen, params.stochLen, params.stochK, params.stochD);
+      const k1h = stoch1h.k[stoch1h.k.length-1];
+      const k15m = stoch15m.k[stoch15m.k.length-1];
+      const k1m = stoch1m.k[stoch1m.k.length-1];
+      const ok1h = k1h!=null && k1h>=ext1hThresh;
+      const ok15m = k15m!=null && k15m>=ext15mThresh;
+      const ok1m = k1m!=null && k1m>=ext1mThresh;
+      const extremeAll = ok1h && ok15m && ok1m;
+
+      $('ext1hK').textContent = fmt(k1h,1);
+      $('ext1hTag').innerHTML = k1h==null ? '<span class="tag dim">—</span>' : ok1h ? '<span class="tag bear">≥ '+ext1hThresh+'</span>' : '<span class="tag dim">Por debajo</span>';
+      $('ext15mK').textContent = fmt(k15m,1);
+      $('ext15mTag').innerHTML = k15m==null ? '<span class="tag dim">—</span>' : ok15m ? '<span class="tag bear">≥ '+ext15mThresh+'</span>' : '<span class="tag dim">Por debajo</span>';
+      $('ext1mK').textContent = fmt(k1m,1);
+      $('ext1mTag').innerHTML = k1m==null ? '<span class="tag dim">—</span>' : ok1m ? '<span class="tag bear">≥ '+ext1mThresh+'</span>' : '<span class="tag dim">Por debajo</span>';
+
+      const banner = $('extremeBanner');
+      if (extremeAll){
+        banner.style.display = 'block';
+        banner.style.background = 'var(--bear-soft)';
+        banner.style.border = '1px solid var(--bear-line)';
+        banner.style.color = 'var(--bear)';
+        banner.textContent = `▼ SOBRECOMPRA EXTREMA — 1H(${fmt(k1h,0)}) · 15m(${fmt(k15m,0)}) · 1m(${fmt(k1m,0)}) confirmando`;
+      } else {
+        banner.style.display = 'none';
+      }
+      if (extremeAll && !prevExtreme){
+        beep(300); setTimeout(()=>beep(300), 220);
+        pushExtremeLog('SHORT-EXTREMO', symbol);
+      }
+      prevExtreme = extremeAll;
+
+      // ---- Señal extra: sobreventa extrema en cascada 1H → 15m → 1m (solo Long) — reutiliza los mismos K ya calculados ----
+      const ext1hThreshLong = parseFloat($('ext1hThreshLong').value)||20;
+      const ext15mThreshLong = parseFloat($('ext15mThreshLong').value)||10;
+      const ext1mThreshLong = parseFloat($('ext1mThreshLong').value)||2;
+
+      const okLong1h = k1h!=null && k1h<=ext1hThreshLong;
+      const okLong15m = k15m!=null && k15m<=ext15mThreshLong;
+      const okLong1m = k1m!=null && k1m<=ext1mThreshLong;
+      const extremeAllLong = okLong1h && okLong15m && okLong1m;
+
+      $('ext1hKLong').textContent = fmt(k1h,1);
+      $('ext1hTagLong').innerHTML = k1h==null ? '<span class="tag dim">—</span>' : okLong1h ? '<span class="tag bull">≤ '+ext1hThreshLong+'</span>' : '<span class="tag dim">Por encima</span>';
+      $('ext15mKLong').textContent = fmt(k15m,1);
+      $('ext15mTagLong').innerHTML = k15m==null ? '<span class="tag dim">—</span>' : okLong15m ? '<span class="tag bull">≤ '+ext15mThreshLong+'</span>' : '<span class="tag dim">Por encima</span>';
+      $('ext1mKLong').textContent = fmt(k1m,1);
+      $('ext1mTagLong').innerHTML = k1m==null ? '<span class="tag dim">—</span>' : okLong1m ? '<span class="tag bull">≤ '+ext1mThreshLong+'</span>' : '<span class="tag dim">Por encima</span>';
+
+      const bannerLong = $('extremeBannerLong');
+      if (extremeAllLong){
+        bannerLong.style.display = 'block';
+        bannerLong.style.background = 'var(--bull-soft)';
+        bannerLong.style.border = '1px solid var(--bull-line)';
+        bannerLong.style.color = 'var(--bull)';
+        bannerLong.textContent = `▲ SOBREVENTA EXTREMA — 1H(${fmt(k1h,0)}) · 15m(${fmt(k15m,0)}) · 1m(${fmt(k1m,0)}) confirmando`;
+      } else {
+        bannerLong.style.display = 'none';
+      }
+      if (extremeAllLong && !prevExtremeLong){
+        beep(300); setTimeout(()=>beep(300), 220);
+        pushExtremeLog('LONG-EXTREMO', symbol);
+      }
+      prevExtremeLong = extremeAllLong;
+
+      $('liveDot').className = 'dot-live ok';
+      $('statusText').textContent = 'actualizado (vela cerrada) ' + new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    } catch(err){
+      $('liveDot').className = 'dot-live err';
+      $('statusText').textContent = 'error al conectar con Binance';
+      console.error(err);
+    }
+  }
+
+  // ---------------- simple backtest (adapted to the single-timeframe engine) ----------------
+  function evaluateOutcome(closeArr, i, dir, lookaheadBars, thresholdPct){
+    const entry = closeArr[i];
+    for (let j=i+1; j<=Math.min(i+lookaheadBars, closeArr.length-1); j++){
+      const chg = (closeArr[j]-entry)/entry*100;
+      if (dir==='long'){ if (chg>=thresholdPct) return 'acierto'; if (chg<=-thresholdPct) return 'fallo'; }
+      else { if (chg<=-thresholdPct) return 'acierto'; if (chg>=thresholdPct) return 'fallo'; }
+    }
+    return 'sin definir';
+  }
+  function runBacktest(){
+    if (!lastData) return;
+    const { symbol, params, trend, signal } = lastData;
+    const lookahead = parseInt($('btLookahead').value)||30;
+    const threshold = parseFloat($('btThreshold').value)||0.5;
+    const results = [];
+
+    for (let i=60; i<signal.close.length-1; i++){
+      const es = evalSignalAt(signal, i, params);
+      const t = signal.openTime[i];
+      const trendIdx = findIndexAtOrBefore(trend.openTime, t);
+      if (trendIdx<0) continue;
+      const ef = trend.emaFast[trendIdx], eslow = trend.emaSlow[trendIdx];
+      if (ef==null||eslow==null) continue;
+      const trendBull = ef>eslow;
+
+      let dir=null;
+      if (trendBull && es.momentumBull && es.adxOk && es.stochLongOk) dir='long';
+      else if (!trendBull && es.momentumBear && es.adxOk && es.stochShortOk) dir='short';
+      if (!dir) continue;
+
+      const outcome = evaluateOutcome(signal.close, i, dir, lookahead, threshold);
+      results.push({ time: new Date(t).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}), dir, outcome });
+    }
+
+    const el = $('btResults'), sumEl = $('btSummary');
+    if (!results.length){
+      el.innerHTML = '<div class="bt-empty">No se encontraron señales completas (①②③④) en el historial disponible para esta combinación de temporalidades y parámetros. Probá con umbrales menos estrictos o una temporalidad de señal más rápida (más historial disponible).</div>';
+      sumEl.style.display='none';
+      return;
+    }
+    const acier = results.filter(r=>r.outcome==='acierto').length;
+    const fall = results.filter(r=>r.outcome==='fallo').length;
+    const sind = results.filter(r=>r.outcome==='sin definir').length;
+    const rate = ((acier/(acier+fall||1))*100).toFixed(0);
+    sumEl.style.display='block';
+    sumEl.innerHTML = `<b>${results.length}</b> señales encontradas · <b>${acier}</b> aciertos · <b>${fall}</b> fallos · <b>${sind}</b> sin definir · tasa de acierto (excluyendo "sin definir"): <b>${rate}%</b>`;
+    el.innerHTML = '<table><thead><tr><th>Momento</th><th>Dirección</th><th>Resultado</th></tr></thead><tbody>'+
+      results.slice().reverse().map(r=>{
+        const dirTag = r.dir==='short' ? '<span class="tag bear">SHORT</span>' : '<span class="tag bull">LONG</span>';
+        const outTag = r.outcome==='acierto' ? '<span class="tag bull">Acierto</span>' : r.outcome==='fallo' ? '<span class="tag bear">Fallo</span>' : '<span class="tag dim">Sin definir</span>';
+        return `<tr><td>${r.time}</td><td>${dirTag}</td><td>${outTag}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+
+  // ---------------- wiring ----------------
+  $('symbolSelect').addEventListener('change', e=>{ $('customSymbolField').style.display = e.target.value==='__custom' ? 'flex' : 'none'; });
+  $('refreshBtn').addEventListener('click', run);
+  $('btRunBtn').addEventListener('click', runBacktest);
+  ['symbolSelect','trendInterval','signalInterval','emaFast','emaSlow','adxThreshold','stochRsiLen','stochLen','stochK','stochD','stochOS','stochOB','requireCross','ext1hThresh','ext15mThresh','ext1mThresh','ext1hThreshLong','ext15mThreshLong','ext1mThreshLong'].forEach(id=>{
+    $(id).addEventListener('change', ()=>{ prevOverall=null; run(); });
+  });
+  $('customSymbol').addEventListener('keydown', e=>{ if(e.key==='Enter'){ prevOverall=null; run(); } });
+
+  function schedule(){ if (pollTimer) clearInterval(pollTimer); pollTimer = setInterval(run, 60000); }
+
+  // Cargar historial persistido (10 días) antes de la primera actualización
+  logEntries = loadPersisted(LOG_KEY);
+  extremeLogEntries = loadPersisted(EXT_LOG_KEY);
+  preLogEntries = loadPersisted(PRE_LOG_KEY);
+  renderMainLog();
+  renderExtremeLog();
+  renderPreLog();
+
+  run();
+  schedule();
+})();
+
+// ---------- PWA Service Worker Registration ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').then(reg => {
+      console.log('Service Worker registrado:', reg);
+      // Check for updates every 60 seconds
+      setInterval(() => {
+        reg.update();
+      }, 60000);
+    }).catch(err => {
+      console.log('Error al registrar Service Worker:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
